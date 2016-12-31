@@ -19,6 +19,11 @@ namespace VFXWinForms
     {
         Thread displayThread;
 
+
+        string fileLocation;
+
+        Color min = Color.Transparent;
+        Color max = Color.Transparent;
         public Form1()
         {
             InitializeComponent();
@@ -26,7 +31,7 @@ namespace VFXWinForms
             displayThread = new Thread(ThreadMain);
 
             displayThread.IsBackground = true;
-            displayThread.Start();
+            //displayThread.Start();
             
         }
 
@@ -35,6 +40,9 @@ namespace VFXWinForms
         {
             //MessageBox.Show("Hi from the thread!");
 
+            VideoWriter writer = new VideoWriter("video.mp4", 60, new Size(1280, 720), true);
+
+            int frame = 0;
             Capture cap = new Emgu.CV.Capture(@"C:\Users\Peter Husman\Downloads\Wildlife.wmv");
             Mat minions = new Capture(@"C:\Users\Peter Husman\Downloads\maxresdefault.jpg").QueryFrame();
 
@@ -56,12 +64,13 @@ namespace VFXWinForms
                     //CvInvoke.InRange
 
                     //filter.Apply(data, hsv);
-                    ChromaKey(data, minions, chroma);
-                    
-
+                    ChromaKey(data, minions, chroma,min,max);
+                    CvInvoke.Imwrite($"{fileLocation}{frame.ToString()}.jpg", chroma);
+                    //writer.Write(chroma);
                     CvInvoke.Imshow("Window", chroma);
                     CvInvoke.WaitKey(1);
-
+                    frame++;
+                    
                 }
                 catch (Exception ex)
                 {
@@ -73,7 +82,7 @@ namespace VFXWinForms
 
 
 
-        public void ChromaKey(Mat under, Mat over, Mat dest)
+        public void ChromaKey(Mat under, Mat over, Mat dest, Color colorMin, Color colorMax)
         {
             dest.Create(under.Rows, under.Cols, DepthType.Cv8U, 3);
             Bitmap ubmp = under.Bitmap;
@@ -84,14 +93,14 @@ namespace VFXWinForms
             BitmapData dataover = obmp.LockBits(new Rectangle(0, 0, obmp.Width, obmp.Height), ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
             BitmapData datadst = dst.LockBits(new Rectangle(0, 0, dst.Width, dst.Height), ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
 
-            byte redLow = 0;
-            byte redHigh = 255;
+            byte redLow = colorMin.R;
+            byte redHigh = colorMax.R;
 
-            byte greenLow = 200;
-            byte greenHigh = 255;
+            byte greenLow = colorMin.G;
+            byte greenHigh = colorMax.G;
 
-            byte blueLow = 0;
-            byte blueHigh = 255;
+            byte blueLow = colorMin.B;
+            byte blueHigh = colorMax.B;
 
             unsafe
             {
@@ -123,6 +132,42 @@ namespace VFXWinForms
             obmp.UnlockBits(dataover);
             dst.UnlockBits(datadst);
 
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void buttonColorMin_Click(object sender, EventArgs e)
+        {
+            if (colorDialogMin.ShowDialog() == DialogResult.OK)
+            {
+                min = colorDialogMin.Color;
+            }
+
+        }
+
+        private void buttonMax_Click(object sender, EventArgs e)
+        {
+            if(colorDialogMax.ShowDialog() == DialogResult.OK)
+            {
+                max = colorDialogMax.Color;
+            }
+        }
+
+        private void strtProcess_Click(object sender, EventArgs e)
+        {
+            if(max != Color.Transparent && min != Color.Transparent)
+            {
+                saveFile.ShowDialog();
+                displayThread.Start();
+            }
+        }
+
+        private void saveFile_FileOk(object sender, CancelEventArgs e)
+        {
+            fileLocation = ((SaveFileDialog)sender).FileName.Replace("Save Location.txt","") ;
         }
     }
 }
