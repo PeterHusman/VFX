@@ -31,8 +31,16 @@ namespace VFXWinForms
             displayThread = new Thread(ThreadMain);
 
             displayThread.IsBackground = true;
-            //displayThread.Start();
+            displayThread.Start();
             
+        }
+
+
+        public void Mask(Mat input, Mat mask, Mat output)
+        {
+            mask.ConvertTo(mask,DepthType.Cv8U);
+            CvInvoke.BitwiseXor(output, output, output);
+            input.CopyTo(output, mask);
         }
 
 
@@ -49,6 +57,14 @@ namespace VFXWinForms
             Mat data = new Mat();
             Mat chroma = new Mat();
 
+            Mat threshold = new Mat();
+            Mat bNot = new Mat();
+
+            Mat minionsMask = new Mat();
+            Mat vidMask = new Mat();
+
+
+
             var filter = new BackgroundSubtractorMOG();
 
             while (true)
@@ -58,14 +74,24 @@ namespace VFXWinForms
                     cap.Grab();
                     bool grabbed = cap.Retrieve(data);
 
+
+                    CvInvoke.InRange(minions, new ScalarArray(new Emgu.CV.Structure.MCvScalar(0, 206, 0)), new ScalarArray(new Emgu.CV.Structure.MCvScalar(129, 255, 164)), threshold);
+                    threshold.CopyTo(bNot);
+                    CvInvoke.BitwiseNot(bNot,bNot);
+                    Mask(minions,bNot,minionsMask);
+
+                    Mask(data,threshold,vidMask);
+                    
+                    CvInvoke.BitwiseOr(minionsMask,vidMask,chroma);
+
                     //CvInvoke.CvtColor(data, hsv, ColorConversion.Bgr2Hsv);
                     //BackgroundSubtractorMOG
                     //data.Dispose();
                     //CvInvoke.InRange
 
                     //filter.Apply(data, hsv);
-                    ChromaKey(data, minions, chroma,min,max);
-                    CvInvoke.Imwrite($"{fileLocation}{frame.ToString()}.jpg", chroma);
+                    //ChromaKey(data, minions, chroma,min,max);
+                    //CvInvoke.Imwrite($"{fileLocation}{frame.ToString()}.jpg", data);
                     //writer.Write(chroma);
                     CvInvoke.Imshow("Window", chroma);
                     CvInvoke.WaitKey(1);
@@ -82,57 +108,7 @@ namespace VFXWinForms
 
 
 
-        public void ChromaKey(Mat under, Mat over, Mat dest, Color colorMin, Color colorMax)
-        {
-            dest.Create(under.Rows, under.Cols, DepthType.Cv8U, 3);
-            Bitmap ubmp = under.Bitmap;
-            Bitmap obmp = over.Bitmap;
-            Bitmap dst = dest.Bitmap;
-
-            BitmapData dataunder = ubmp.LockBits(new Rectangle(0, 0, ubmp.Width, ubmp.Height), ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
-            BitmapData dataover = obmp.LockBits(new Rectangle(0, 0, obmp.Width, obmp.Height), ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
-            BitmapData datadst = dst.LockBits(new Rectangle(0, 0, dst.Width, dst.Height), ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
-
-            byte redLow = colorMin.R;
-            byte redHigh = colorMax.R;
-
-            byte greenLow = colorMin.G;
-            byte greenHigh = colorMax.G;
-
-            byte blueLow = colorMin.B;
-            byte blueHigh = colorMax.B;
-
-            unsafe
-            {
-                byte* ptrO = (byte*)dataover.Scan0;
-                byte* ptrU = (byte*)dataunder.Scan0;
-                byte* ptrD = (byte*)datadst.Scan0;
-
-
-
-                for (int i = 0; i < under.Rows * under.Cols * 3; i+=3)
-                {
-                    if (ptrO[i] >= redLow && ptrO[i] <= redHigh && ptrO[i + 1] >= greenLow && ptrO[i+1] <= greenHigh && ptrO[i + 2] >= blueLow && ptrO[i + 2] <= blueHigh)
-                    {
-                        ptrD[i] = ptrU[i];
-                        ptrD[i + 1] = ptrU[i + 1];
-                        ptrD[i + 2] = ptrU[i + 2];
-                    }
-                    else
-                    {
-
-                        ptrD[i] = ptrO[i];
-                        ptrD[i + 1] = ptrO[i + 1];
-                        ptrD[i + 2] = ptrO[i + 2];
-                    }
-                }
-            }
-
-            ubmp.UnlockBits(dataunder);
-            obmp.UnlockBits(dataover);
-            dst.UnlockBits(datadst);
-
-        }
+       
 
         private void Form1_Load(object sender, EventArgs e)
         {
